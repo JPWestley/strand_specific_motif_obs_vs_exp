@@ -6,6 +6,8 @@
 
 library(Biostrings)
 library(tidyverse)
+library(RColourbrewer)
+install.packages("RColorbrewer")
 
 # 2.0 define functions ####
 
@@ -108,8 +110,7 @@ rm_motif_enrichment_strandwise <- function(genome, motif_seq) {
 
 # 3.0 looping over all motifs and genomes ####
 
-
-motifs <- read.csv("datafiles/motifs.csv")
+motifs <- read.csv("datafiles/raw/motifs.csv")
 
 # quick check to make sure no motifs are duplicated 
 # motifs$motif <- as.factor(motifs$motif)
@@ -143,10 +144,135 @@ for (i in 1:length(genomes)){
     d <- rm_motif_enrichment_strandwise(genome = genomes[i], motif_seq = motifs[y])
     data <- rbind(data,d)
   }
-} 
+}
 
 endTime <- Sys.time()
 
 print(endTime - startTime) 
 
+write.csv(data,file = "datafiles/processed/obvs_vs_exp.csv",row.names = F)
 
+# 4.0 adding in columns ####
+
+data <- read.csv("datafiles/processed/obvs_vs_exp.csv")
+dict <- read.csv("datafiles/raw/phage_type_dict.csv")
+motifs <- read.csv("datafiles/raw/motifs.csv")
+
+motifs <- motifs %>%
+  filter(type != "RM_Type_I")
+
+data <- left_join(data,dict)
+
+data <- left_join(data,motifs)
+
+# 5.0 poisson testing ####
+
+results <- data %>%
+  rowwise() %>%
+  mutate(
+    pval = poisson.test(observed, T = expected, r = 1, alternative = "two.sided")$p.value,
+  ) %>%
+  ungroup()
+
+results <- results %>%
+  mutate(
+    pval.adj = p.adjust(pval, method = "fdr"),
+  )
+
+results <- results %>%
+  mutate(
+    sig = case_when(
+      pval.adj < 0.001 ~ "***",
+      pval.adj < 0.01  ~ "**",
+      pval.adj < 0.05  ~ "*",
+      TRUE ~ ""
+    )
+  )
+
+results <- results %>%
+  mutate(
+    direction = case_when(
+      pval.adj < 0.05 & enrichment < 1 ~ "Significantly lower",
+      pval.adj < 0.05 & enrichment > 1 ~ "Significantly higher",
+      TRUE ~ "Non-significant"
+    )
+  )
+
+results <- results %>%
+  mutate(normalised_ratio = (observed-expected)/(observed+expected))
+
+results_wide <- results %>%
+  pivot_wider(id_cols = c(motif,genome,motif_abundance,phage_type,genome_length,type,sub_type,Palindromic),
+              names_from = strand,
+              values_from = c(observed, expected, enrichment,pval,pval.adj,sig,direction,normalised_ratio))
+
+results_wide <- results_wide %>%
+  mutate(result = case_when(
+    direction_forward == "Significantly lower" & direction_reverse == "Significantly lower" ~ "Double depleted",
+    
+    direction_forward == "Significantly higher" & direction_reverse == "Significantly higher" ~ "Double enriched",
+    
+    direction_forward == "Significantly lower" & direction_reverse == "Non-significant" ~ "Single depleted",
+    direction_forward == "Non-significant" & direction_reverse == "Significantly lower" ~ "Single depleted",
+    
+    direction_forward == "Significantly higher" & direction_reverse == "Non-significant" ~ "Single enriched",
+    direction_forward == "Non-significant" & direction_reverse == "Significantly higher" ~ "Single enriched",
+    
+    direction_forward == "Significantly lower" & direction_reverse == "Significantly higher" ~ "Depleted and enriched",
+    direction_forward == "Significantly higher" & direction_reverse == "Significantly lower" ~ "Depleted and enriched",
+    
+    direction_forward == "Non-significant" & direction_reverse == "Non-significant" ~ "Non-significant"
+    
+  ))
+
+# 6.0 Plotting ####
+
+str(results_wide)
+
+results_wide$type <- as.factor(results_wide$type)
+results_wide$result <- as.factor(results_wide$result)
+
+p <- ggplot(results_wide,aes(x = normalised_ratio_forward, y = normalised_ratio_reverse,color = result))+
+  geom_point(alpha = 0.1) +
+  facet_wrap(~type)+
+  xlim(-1,1) +
+  ylim(-1,1) +
+  geom_hline(yintercept=0,linewidth = 0.5) +
+  geom_vline(xintercept=0,linewidth = 0.5) +
+  theme_bw() +
+  scale_color_brewer(palette="Dark2")  +
+  xlab("Ratio of observed to expected fwd strand (normalised)") +
+  ylab("Ratio of observed to expected\n rvs strand (normalised)") +
+  #scale_color_manual(values = c("Significantly enriched" = "#1B9E77FF", "Non-significant" = "grey", "Significantly depleted" = "#D95F02FF"))+
+  labs(colour = "Statistical significance")+
+  theme(legend.position = "bottom")
+
+p
+
+# no palindromes 
+
+results_wide_NP <- results_wide %>%
+  filter(Palindromic == "Non-palindromic")
+
+p <- ggplot(results_wide_NP,aes(x = normalised_ratio_forward, y = normalised_ratio_reverse,color = result))+
+  geom_point(alpha = 0.1) +
+  facet_wrap(~type)+
+  xlim(-1,1) +
+  ylim(-1,1) +
+  geom_hline(yintercept=0,linewidth = 0.5) +
+  geom_vline(xintercept=0,linewidth = 0.5) +
+  theme_bw() +
+  scale_color_brewer(palette="Dark2")  +
+  xlab("Ratio of observed to expected fwd strand (normalised)") +
+  ylab("Ratio of observed to expected\n rvs strand (normalised)") +
+  #scale_color_manual(values = c("Significantly enriched" = "#1B9E77FF", "Non-significant" = "grey", "Significantly depleted" = "#D95F02FF"))+
+  labs(colour = "Statistical significance")+
+  theme(legend.position = "bottom")
+
+p
+
+pp <- ggplot(data=results_wide, aes(x=type, y = ,fill = result)) + 
+  geom_bar(position = "fill")+
+  theme_bw()
+
+pp
