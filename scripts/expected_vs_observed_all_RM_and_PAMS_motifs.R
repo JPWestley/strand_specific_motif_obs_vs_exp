@@ -7,7 +7,7 @@
 library(Biostrings)
 library(tidyverse)
 library(RColourbrewer)
-install.packages("RColorbrewer")
+#install.packages("RColorbrewer")
 
 # 2.0 define functions ####
 
@@ -124,7 +124,7 @@ motifs <- motifs %>%
 
 motifs <- as.vector(motifs$motif)
 
-genomes <- list.files("datafiles/genomes",full.names = T)
+genomes <- list.files("datafiles/store",full.names = T)
 
 data <- data.frame(
   motif = character(),
@@ -149,6 +149,8 @@ for (i in 1:length(genomes)){
 endTime <- Sys.time()
 
 print(endTime - startTime) 
+
+identical(data,data2)
 
 write.csv(data,file = "datafiles/processed/obvs_vs_exp.csv",row.names = F)
 
