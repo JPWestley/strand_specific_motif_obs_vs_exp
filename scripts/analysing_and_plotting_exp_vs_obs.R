@@ -558,3 +558,102 @@ jpeg("plots/p14.jpeg", width = 2400, height = 1200, units = "px", res = 300)
 p14
 
 dev.off()
+
+results_wide$motif <- as.factor(results_wide$motif)
+
+results_wide_TI <- results_wide %>%
+  filter(type == "RM_Type_I")
+
+results_wide_TII <- results_wide %>%
+  filter(type == "RM_Type_II")
+
+results_wide_TIII <- results_wide %>%
+  filter(type == "RM_Type_III")
+
+results_wide_PAMS <- results_wide %>%
+  filter(type == "PAMS")
+
+
+p15 <- ggplot(results_wide_TI,aes(x = normalised_ratio_forward, y = normalised_ratio_reverse))+
+  geom_pointdensity(adjust= 0.1) +
+  facet_wrap(~motif,ncol = 8)+
+  xlim(-1,1) +
+  ylim(-1,1) +
+  geom_hline(yintercept=0,linewidth = 0.5) +
+  geom_vline(xintercept=0,linewidth = 0.5) +
+  theme_bw() +
+  scale_color_viridis(trans = "log10")+
+  xlab("Ratio of observed to expected fwd strand (normalised)") +
+  ylab("Ratio of observed to expected\n rvs strand (normalised)") +
+  labs(colour = "Density")+
+  theme(legend.position = "bottom")
+
+jpeg("plots/p15.jpeg", width = 4000, height = 3000, units = "px", res = 300)
+
+p15
+
+dev.off()
+
+p16 <- ggplot(results_wide_TII,aes(x = normalised_ratio_forward, y = normalised_ratio_reverse, color = sub_type))+
+  geom_pointdensity(adjust= 0.1) +
+  facet_wrap(~motif,ncol = 6)+
+  xlim(-1,1) +
+  ylim(-1,1) +
+  geom_hline(yintercept=0,linewidth = 0.5) +
+  geom_vline(xintercept=0,linewidth = 0.5) +
+  theme_bw() +
+  scale_color_brewer(palette = "Dark2")+
+  xlab("Ratio of observed to expected fwd strand (normalised)") +
+  ylab("Ratio of observed to expected\n rvs strand (normalised)") +
+  #labs(colour = "Density")+
+  theme(legend.position = "bottom")
+
+jpeg("plots/p16.jpeg", width = 3000, height = 3000, units = "px", res = 300)
+
+p16
+
+dev.off()
+
+p17 <- ggplot(results_wide_TIII,aes(x = normalised_ratio_forward, y = normalised_ratio_reverse))+
+  geom_pointdensity(adjust= 0.1) +
+  facet_wrap(~motif,ncol = 4)+
+  xlim(-1,1) +
+  ylim(-1,1) +
+  geom_hline(yintercept=0,linewidth = 0.5) +
+  geom_vline(xintercept=0,linewidth = 0.5) +
+  theme_bw() +
+  scale_color_viridis(trans = "log10")+
+  xlab("Ratio of observed to expected fwd strand (normalised)") +
+  ylab("Ratio of observed to expected\n rvs strand (normalised)") +
+  labs(colour = "Density")+
+  theme(legend.position = "bottom")
+
+jpeg("plots/p17.jpeg", width = 3000, height = 2500, units = "px", res = 300)
+
+p17
+
+dev.off()
+
+p18 <- ggplot(results_wide_PAMS,aes(x = normalised_ratio_forward, y = normalised_ratio_reverse))+
+  geom_pointdensity(adjust= 0.1) +
+  facet_wrap(~motif,ncol = 2)+
+  xlim(-1,1) +
+  ylim(-1,1) +
+  geom_hline(yintercept=0,linewidth = 0.5) +
+  geom_vline(xintercept=0,linewidth = 0.5) +
+  theme_bw() +
+  scale_color_viridis(trans = "log10")+
+  xlab("Ratio of observed to expected fwd strand (normalised)") +
+  ylab("Ratio of observed to expected\n rvs strand (normalised)") +
+  labs(colour = "Density")+
+  theme(legend.position = "bottom")
+
+jpeg("plots/p18.jpeg", width = 2000, height = 1300, units = "px", res = 300)
+
+p18
+
+dev.off()
+
+
+
+
