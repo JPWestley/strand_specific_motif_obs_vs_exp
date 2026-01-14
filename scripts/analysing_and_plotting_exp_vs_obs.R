@@ -429,7 +429,7 @@ p10
 dev.off()
 
 
-# separating out by phage type 
+# separating out by phage type NOTE YOU HAVE NAS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 results_wide_lyt <- results_wide %>%
   filter(phage_type == "lytic")
