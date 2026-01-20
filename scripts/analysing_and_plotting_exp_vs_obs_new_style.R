@@ -118,6 +118,7 @@ results_wide <- results_wide %>%
     type == "RM_Type_I" & Palindromic == "Palindromic" ~ "Palindromic\nType I RM",
     sub_type == "RM_Type_IIG" ~ "RM Type IIG & IIS",
     sub_type == "RM_Type_IIS" ~ "RM Type IIG & IIS",
+    sub_type == "RM_Type_IIP" ~ "RM Type IIP",
     sub_type == "RM_Type_III" ~ "RM Type III",
     TRUE ~ sub_type)) %>%
   filter(sub_type != "RM_Type_IIM")
@@ -336,8 +337,46 @@ figure
 
 dev.off()
 
+## 4.2 incorporating abundances ####
 
+results_wide_temp
+results_wide_lyt
 
+hist(results_wide_lyt$motif_abundance)
+
+results_wide_lyt <- results_wide_lyt %>%
+  mutate(
+    abundance_percentile = percent_rank(motif_abundance) * 100,
+    abundance_bin = round(abundance_percentile / 20) * 10
+  )
+
+results_wide_lyt$abundance_bin <- as.factor(results_wide_lyt$abundance_bin)
+
+p3_lyt <- ggplot(data=results_wide_lyt, aes(x= abundance_bin, y = ,fill = result)) + 
+  geom_bar(position = "fill")+
+  facet_wrap(~sub_type2) +
+  scale_fill_manual(
+    values = c(
+      "Non-significant"        = "#3D3D3D",
+      "Depleted and enriched"  = "#12436D",
+      "Double depleted"        = "#28A197",
+      "Double enriched"        = "#801650",
+      "Single depleted"        = "#F46A25",
+      "Single enriched"        = "#A285D1"
+    ), guide = guide_legend(ncol = 2)
+  ) +
+  labs(fill = "Strand specific\nsignificance")+
+  xlab("Defence system type") +
+  ylab("Proportion") +
+  theme_bw()+
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text = element_text(size = 14),
+    axis.title = element_text(size = 16),
+    legend.position = "bottom"
+  )
+
+p3_lyt
 
 
 
