@@ -9,14 +9,18 @@ library(RColorBrewer)
 library(ggpointdensity)
 library(Biostrings)
 library(viridis)
-
-#install.packages("viridis")
+library(ggpubr)
+library(patchwork)
+library(cowplot)
 
 # 2.0 loading and joining dataframes ####
 
 data <- read.csv("datafiles/processed/obvs_vs_exp.csv")
 dict <- read.csv("datafiles/raw/phage_type_dict.csv")
 motifs <- read.csv("datafiles/raw/motifs.csv")
+
+data <- data %>%
+  mutate(genome = str_replace(genome, "^CPL0*", "P")) 
 
 data <- left_join(data,dict)
 
@@ -56,7 +60,7 @@ results_wide <- results %>%
               names_from = strand,
               values_from = c(observed, expected, enrichment,signed_log_SR,SR))
 
-threshold <- log10(1.96 + 1)  # 95% cutoff on signed log10 SR scale (need cutoff to be 2.5 to aproximate same levels of significance as FDR corrected)
+threshold <- log10(2.576 + 1)  # 95% cutoff on signed log10 SR scale (need cutoff to be 2.5 to aproximate same levels of significance as FDR corrected)
 
 results_wide <- results_wide %>%
   mutate(
@@ -81,7 +85,6 @@ results_wide <- results_wide %>%
 str(results_wide)
 
 results_wide$type <- as.factor(results_wide$type)
-# results_wide$result <- as.factor(results_wide$result)
 
 results_wide$motif <- as.character(results_wide$motif)
 
@@ -109,7 +112,261 @@ results_wide$result <- factor(
 results_wide_NP <- results_wide %>%
   filter(Palindromic == "Non-palindromic")
 
+results_wide <- results_wide %>%
+  mutate(sub_type2 = case_when(
+    type == "RM_Type_I" & Palindromic == "Non-palindromic" ~ "Non-palindromic\nType I_RM",
+    type == "RM_Type_I" & Palindromic == "Palindromic" ~ "Palindromic\nType I RM",
+    sub_type == "RM_Type_IIG" ~ "RM Type IIG & IIS",
+    sub_type == "RM_Type_IIS" ~ "RM Type IIG & IIS",
+    sub_type == "RM_Type_III" ~ "RM Type III",
+    TRUE ~ sub_type)) %>%
+  filter(sub_type != "RM_Type_IIM")
+  
+
+results_wide$sub_type2 <- as.factor(results_wide$sub_type2)
+
+results_wide$sub_type2 <- factor(
+  results_wide$sub_type2,
+  levels = c(
+    "Non-palindromic\nType I_RM",
+    "Palindromic\nType I RM",
+    "RM Type IIG & IIS",
+    "RM Type IIP",
+    "RM Type III",
+    "PAMS"
+  ))
+
+
+
 # 4.0 Plotting ####
+
+## 4.1 new style ####
+
+bins <- 30
+
+results_wide_lyt <- results_wide %>%
+  filter(phage_type == "lytic")
+
+results_wide_temp <- results_wide %>%
+  filter(phage_type == "temperate")
+
+binned_lyt <- results_wide_lyt %>%
+  group_by(sub_type2) %>%
+  mutate(
+    x_bin = cut(signed_log_SR_forward, breaks = seq(-1, 1.3, length.out = bins + 1), include.lowest = TRUE, labels = FALSE),
+    y_bin = cut(signed_log_SR_reverse, breaks = seq(-1, 1.3, length.out = bins + 1), include.lowest = TRUE, labels = FALSE)
+  ) %>%
+  count(sub_type2, x_bin, y_bin) %>%
+  group_by(sub_type2) %>%
+  mutate(prop = n / sum(n)) %>%
+  ungroup() %>%
+  mutate(
+    x_mid = -1 + (x_bin - 0.5) * (1.3 - (-1)) / bins,
+    y_mid = -1 + (y_bin - 0.5) * (1.3 - (-1)) / bins
+  )
+
+binned_temp <- results_wide_temp %>%
+  group_by(sub_type2) %>%
+  mutate(
+    x_bin = cut(signed_log_SR_forward, breaks = seq(-1, 1.3, length.out = bins + 1), include.lowest = TRUE, labels = FALSE),
+    y_bin = cut(signed_log_SR_reverse, breaks = seq(-1, 1.3, length.out = bins + 1), include.lowest = TRUE, labels = FALSE)
+  ) %>%
+  count(sub_type2, x_bin, y_bin) %>%
+  group_by(sub_type2) %>%
+  mutate(prop = n / sum(n)) %>%
+  ungroup() %>%
+  mutate(
+    x_mid = -1 + (x_bin - 0.5) * (1.3 - (-1)) / bins,
+    y_mid = -1 + (y_bin - 0.5) * (1.3 - (-1)) / bins
+  )
+
+p1_lyt <- ggplot(binned_lyt, aes(x = x_mid, y = y_mid, fill = log10(prop + 1e-6))) +
+  geom_tile(width = diff(range(-1,1.3))/30, height = diff(range(-1,1.3))/30) +
+  facet_wrap(~sub_type2) +
+  geom_hline(yintercept = 0, linewidth = 1, linetype = "dashed") +
+  geom_vline(xintercept = 0, linewidth = 1, linetype = "dashed") +
+  geom_hline(yintercept = c(- 0.553,  0.553),linewidth = 0.75) +
+  geom_vline(xintercept = c(- 0.553,  0.553),linewidth = 0.75) +
+  theme_bw() +
+  xlab("Signed log10 standardized residual\n(observed − expected, fwd strand)") +
+  ylab("Signed log10 standardized residual\n(observed − expected, rvs strand)") +
+  labs(fill = "log10(Proportion)") +
+  scale_fill_viridis_c() +
+  theme(legend.position = "bottom",
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16))
+
+#p1_lyt
+
+p1_temp <- ggplot(binned_temp, aes(x = x_mid, y = y_mid, fill = log10(prop + 1e-6))) +
+  geom_tile(width = diff(range(-1,1.3))/30, height = diff(range(-1,1.3))/30) +
+  facet_wrap(~sub_type2) +
+  geom_hline(yintercept = 0, linewidth = 1, linetype = "dashed") +
+  geom_vline(xintercept = 0, linewidth = 1, linetype = "dashed") +
+  geom_hline(yintercept = c(- 0.553,  0.553),linewidth = 0.75) +
+  geom_vline(xintercept = c(- 0.553,  0.553),linewidth = 0.75) +
+  theme_bw() +
+  xlab("Signed log10 standardized residual\n(observed − expected, fwd strand)") +
+  ylab("Signed log10 standardized residual\n(observed − expected, rvs strand)") +
+  labs(fill = "log10(Proportion)") +
+  scale_fill_viridis_c() +
+  theme(legend.position = "bottom",
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16))
+
+#p1_temp
+
+p2_lyt <- ggplot(data=results_wide_lyt, aes(x=sub_type2, y = ,fill = result)) + 
+  geom_bar(position = "fill")+
+  scale_fill_manual(
+    values = c(
+      "Non-significant"        = "#3D3D3D",
+      "Depleted and enriched"  = "#12436D",
+      "Double depleted"        = "#28A197",
+      "Double enriched"        = "#801650",
+      "Single depleted"        = "#F46A25",
+      "Single enriched"        = "#A285D1"
+    ), guide = guide_legend(ncol = 2)
+  ) +
+  labs(fill = "Strand specific\nsignificance")+
+  xlab("Defence system type") +
+  ylab("Proportion") +
+  theme_bw()+
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text = element_text(size = 14),
+    axis.title = element_text(size = 16),
+    legend.position = "bottom"
+  )
+
+
+p2_lyt
+
+p2_temp <- ggplot(data=results_wide_temp, aes(x=sub_type2, y = ,fill = result)) + 
+  geom_bar(position = "fill")+
+  scale_fill_manual(
+    values = c(
+      "Non-significant"        = "#3D3D3D",
+      "Depleted and enriched"  = "#12436D",
+      "Double depleted"        = "#28A197",
+      "Double enriched"        = "#801650",
+      "Single depleted"        = "#F46A25",
+      "Single enriched"        = "#A285D1"
+    ), guide = guide_legend(ncol = 2)
+  ) +
+  labs(fill = "Strand specific\nsignificance")+
+  xlab("Defence system type") +
+  ylab("Proportion") +
+  theme_bw()+
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text = element_text(size = 14),
+    axis.title = element_text(size = 16),
+    legend.position = "bottom"
+  )
+
+#p2_temp
+
+# cowplot getlegend is broken so...
+get_legend2 <- function(plot, legend = NULL) {
+  if (is.ggplot(plot)) {
+    gt <- ggplotGrob(plot)
+  } else {
+    if (is.grob(plot)) {
+      gt <- plot
+    } else {
+      stop("Plot object is neither a ggplot nor a grob.")
+    }
+  }
+  pattern <- "guide-box"
+  if (!is.null(legend)) {
+    pattern <- paste0(pattern, "-", legend)
+  }
+  indices <- grep(pattern, gt$layout$name)
+  not_empty <- !vapply(
+    gt$grobs[indices], 
+    inherits, what = "zeroGrob", 
+    FUN.VALUE = logical(1)
+  )
+  indices <- indices[not_empty]
+  if (length(indices) > 0) {
+    return(gt$grobs[[indices[1]]])
+  }
+  return(NULL)
+}
+
+p1_lyt <- p1_lyt + theme(
+  legend.text = element_text(size = 12),
+  legend.title = element_text(size = 16),
+  legend.key.size = unit(1.3, "cm")
+)
+
+p2_lyt <- p2_lyt + theme(
+  legend.text = element_text(size = 12),
+  legend.title = element_text(size = 16),
+  legend.key.size = unit(1.3, "cm")
+)
+
+
+legend1 <- get_legend2(p1_lyt)
+legend2 <- get_legend2(p2_lyt)
+
+p1_lyt <- p1_lyt + theme(legend.position = "none")
+p2_lyt <- p2_lyt + theme(legend.position = "none")
+p1_temp <- p1_temp + theme(legend.position = "none")
+p2_temp <- p2_temp + theme(legend.position = "none")
+
+
+
+p1_lyt <- p1_lyt + plot_annotation(title = "A) Lytic phages",theme = theme(plot.title = element_text(size = 16)))
+p1_temp <- p1_temp + plot_annotation(title = "B) Temperate phages",theme = theme(plot.title = element_text(size = 16)))
+
+p2_lyt <- p2_lyt + plot_annotation(title = " ",theme = theme(plot.title = element_text(size = 16)))
+p2_temp <- p2_temp + plot_annotation(title = " ",theme = theme(plot.title = element_text(size = 16)))
+
+
+figure <- ggarrange(p1_lyt,p2_lyt,p1_temp,p2_temp,legend1,legend2,
+                    ncol = 2, nrow = 3,
+                    widths =c(2,1),
+                    heights =c(3,3,1) )
+
+jpeg("plots/combined_1.jpeg", width = 5500, height = 5700, units = "px", res = 300)
+
+figure
+
+dev.off()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## 4.2 Older style ####
 
 # facet by major types, keep palindromes, use geom_point 
 
