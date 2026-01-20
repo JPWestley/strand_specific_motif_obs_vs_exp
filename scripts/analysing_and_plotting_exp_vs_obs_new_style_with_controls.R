@@ -15,6 +15,7 @@ library(viridis)
 # 2.0 loading and joining dataframes ####
 
 data <- read.csv("datafiles/processed/obvs_vs_exp.csv")
+
 datac <- read.csv("datafiles/processed/obvs_vs_exp_control_motifs.csv")
 
 dict <- read.csv("datafiles/raw/phage_type_dict.csv")
@@ -23,51 +24,38 @@ motifs <- read.csv("datafiles/raw/motifs.csv")
 data <- left_join(data,dict)
 datac <- left_join(datac,dict)
 
-
-
 # datac <- datac %>%
 #   unique()
 # 
 
 data <- left_join(data,motifs)
 
+data <- data %>%
+  mutate(
+    Palindromic = if_else(
+      motif == as.character(reverseComplement(DNAStringSet(motif))),
+      "Palindromic",
+      "Non-palindromic"
+    )
+  )
+
+datac$subtype <- NULL
+
 datac <- datac %>%
   mutate(type = "control",
-         subtype = "control",
+         sub_type = "control",
          motif_abundance = "1",
-         Palindromic = "Non-palindromic"
-         )
+         Palindromic = if_else(motif == as.character(reverseComplement(DNAStringSet(motif))),"Palindromic","Non-palindromic")
+  )
 
 data2 <- rbind(data,datac)
 
 # 3.0 using standardised residuals ####
 
-results <- data %>%
+results <- data2 %>%
   mutate(
     SR = (observed - expected) / sqrt(expected)) %>%
   mutate(signed_log_SR = sign(SR) * log10(abs(SR) + 1))
-
-# results <- results %>%
-#   mutate(
-#     sig = case_when(
-#       pval.adj < 0.001 ~ "***",
-#       pval.adj < 0.01  ~ "**",
-#       pval.adj < 0.05  ~ "*",
-#       TRUE ~ ""
-#     )
-#   )
-
-# results <- results %>%
-#   mutate(
-#     direction = case_when(
-#       pval.adj < 0.05 & enrichment < 1 ~ "Significantly lower",
-#       pval.adj < 0.05 & enrichment > 1 ~ "Significantly higher",
-#       TRUE ~ "Non-significant"
-#     )
-#   )
-# 
-# results <- results %>%
-#   mutate(normalised_ratio = (observed-expected)/(observed+expected))
 
 results_wide <- results %>%
   pivot_wider(id_cols = c(motif,genome,motif_abundance,phage_type,genome_length,type,sub_type,Palindromic),
@@ -103,15 +91,6 @@ results_wide$type <- as.factor(results_wide$type)
 
 results_wide$motif <- as.character(results_wide$motif)
 
-results_wide <- results_wide %>%
-  mutate(
-    Palindromic = if_else(
-      motif == as.character(reverseComplement(DNAStringSet(motif))),
-      "Palindromic",
-      "Non-palindromic"
-    )
-  )
-
 results_wide$result <- factor(
   results_wide$result,
   levels = c(
@@ -131,21 +110,77 @@ results_wide_NP <- results_wide %>%
 
 # facet by major types, keep palindromes, use geom_point 
 
-p1B <- ggplot(results_wide,aes(x = signed_log_SR_forward, y = signed_log_SR_reverse))+
-  geom_pointdensity(adjust= 0.1,size = 0.7) +
-  facet_wrap(~type)+
-  xlim(-1,1.3) +
-  ylim(-1,1.3) +
-  geom_hline(yintercept=0,linewidth = 0.5,linetype = "dashed") +
-  geom_vline(xintercept=0,linewidth = 0.5,linetype = "dashed") +
-  geom_hline(yintercept = c(-0.471, 0.471))+
-  geom_vline(xintercept = c(-0.471, 0.471))+
+str(results_wide)
+
+# Compute 2D bins per facet
+library(ggplot2)
+library(dplyr)
+
+# Precompute counts per facet
+binned <- results_wide %>%
+  group_by(type) %>%
+  mutate(
+    # Compute bin index along x and y
+    x_bin = cut(signed_log_SR_forward, breaks = seq(-1, 1.3, length.out = 41), include.lowest = TRUE),
+    y_bin = cut(signed_log_SR_reverse, breaks = seq(-1, 1.3, length.out = 41), include.lowest = TRUE)
+  ) %>%
+  count(type, x_bin, y_bin) %>%
+  group_by(type) %>%
+  mutate(prop = n / sum(n)) %>%
+  ungroup() %>%
+  # Convert bins to numeric midpoints for plotting
+  mutate(
+    x_mid = as.numeric(sub("\\((.+),.*", "\\1", x_bin)) + diff(range(-1,1.3))/20/2,
+    y_mid = as.numeric(sub("\\((.+),.*", "\\1", y_bin)) + diff(range(-1,1.3))/20/2
+  )
+
+binned <- binned %>%
+  filter(type != "control")
+
+P <- ggplot(binned, aes(x = x_mid, y = y_mid, fill = log10(prop + 1e-6))) +
+  geom_tile(width = diff(range(-1,1.3))/20, height = diff(range(-1,1.3))/20) +
+  facet_wrap(~type) +
+  geom_hline(yintercept = 0, linewidth = 0.5, linetype = "dashed") +
+  geom_vline(xintercept = 0, linewidth = 0.5, linetype = "dashed") +
+  geom_hline(yintercept = c(- 0.553,  0.553)) +
+  geom_vline(xintercept = c(- 0.553,  0.553)) +
   theme_bw() +
   xlab("Signed log10 standardized residual\n(observed − expected, fwd strand)") +
   ylab("Signed log10 standardized residual\n(observed − expected, rvs strand)") +
-  labs(colour = "Density")+
-  theme(legend.position = "bottom") +
-  scale_color_viridis(trans = "log10")
+  labs(fill = "log10(Proportion)") +
+  scale_fill_viridis_c() +
+  theme(legend.position = "bottom")
+
+P
+
+jpeg("plots/p1C.jpeg", width = 2400, height = 2400, units = "px", res = 300)
+
+P
+
+dev.off()
+
+
+p1B <- ggplot(results_wide, aes(x = signed_log_SR_forward, y = signed_log_SR_reverse)) +
+  geom_bin2d(
+    aes(fill = after_stat(log10((count / sum(count)) + 1e-6))),
+    bins = 40
+  ) +
+  facet_wrap(~type) +
+  coord_cartesian(xlim = c(-1, 1.3), ylim = c(-1, 1.3)) +
+  geom_hline(yintercept = 0, linewidth = 0.5, linetype = "dashed") +
+  geom_vline(xintercept = 0, linewidth = 0.5, linetype = "dashed") +
+  geom_hline(yintercept = c(-0.471, 0.471)) +
+  geom_vline(xintercept = c(-0.471, 0.471)) +
+  theme_bw() +
+  xlab("Signed log10 standardized residual\n(observed − expected, fwd strand)") +
+  ylab("Signed log10 standardized residual\n(observed − expected, rvs strand)") +
+  labs(fill = "log10(Proportion)") +
+  scale_fill_viridis_c() +
+  theme(legend.position = "bottom")
+
+
+
+
 
 jpeg("plots/p1B.jpeg", width = 2400, height = 2400, units = "px", res = 300)
 
@@ -153,6 +188,27 @@ p1B
 
 dev.off()
 
+# p1B <- ggplot(results_wide,aes(x = signed_log_SR_forward, y = signed_log_SR_reverse))+
+#   geom_pointdensity(adjust= 0.1,size = 0.7) +
+#   facet_wrap(~type)+
+#   xlim(-1,1.3) +
+#   ylim(-1,1.3) +
+#   geom_hline(yintercept=0,linewidth = 0.5,linetype = "dashed") +
+#   geom_vline(xintercept=0,linewidth = 0.5,linetype = "dashed") +
+#   geom_hline(yintercept = c(-0.471, 0.471))+
+#   geom_vline(xintercept = c(-0.471, 0.471))+
+#   theme_bw() +
+#   xlab("Signed log10 standardized residual\n(observed − expected, fwd strand)") +
+#   ylab("Signed log10 standardized residual\n(observed − expected, rvs strand)") +
+#   labs(colour = "Density")+
+#   theme(legend.position = "bottom") +
+#   scale_color_viridis(trans = "log10")
+
+jpeg("plots/p1B.jpeg", width = 2400, height = 2400, units = "px", res = 300)
+
+p1B
+
+dev.off()
 
 p2B <- ggplot(results_wide,aes(x = signed_log_SR_forward, y = signed_log_SR_reverse,colour = result))+
   geom_point(size = 1) +
