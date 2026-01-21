@@ -109,8 +109,8 @@ results_wide$result <- factor(
   )
 )
 
-results_wide_NP <- results_wide %>%
-  filter(Palindromic == "Non-palindromic")
+# results_wide_NP <- results_wide %>%
+#   filter(Palindromic == "Non-palindromic")
 
 results_wide <- results_wide %>%
   mutate(sub_type2 = case_when(
@@ -137,19 +137,29 @@ results_wide$sub_type2 <- factor(
     "PAMS"
   ))
 
-
-
-# 4.0 Plotting ####
-
-## 4.1 new style ####
-
-bins <- 30
+## 3.1 producing all sub-dataframes for plotting ####
 
 results_wide_lyt <- results_wide %>%
   filter(phage_type == "lytic")
 
 results_wide_temp <- results_wide %>%
   filter(phage_type == "temperate")
+
+results_wide_lyt_NPTI <- results_wide_lyt %>% filter(sub_type2 == "Non-palindromic\nType I_RM")
+results_wide_lyt_PTI <- results_wide_lyt %>% filter(sub_type2 == "Palindromic\nType I RM")
+results_wide_lyt_NPTII <- results_wide_lyt %>% filter(sub_type2 == "RM Type IIG & IIS")
+results_wide_lyt_PTII <- results_wide_lyt %>% filter(sub_type2 == "RM Type IIP")
+results_wide_lyt_TIII <- results_wide_lyt %>% filter(sub_type2 == "RM Type III")
+results_wide_lyt_PAMS <- results_wide_lyt %>% filter(sub_type2 == "PAMS")
+
+results_wide_temp_NPTI <- results_wide_temp %>% filter(sub_type2 == "Non-palindromic\nType I_RM")
+results_wide_temp_PTI <- results_wide_temp %>% filter(sub_type2 == "Palindromic\nType I RM")
+results_wide_temp_NPTII <- results_wide_temp %>% filter(sub_type2 == "RM Type IIG & IIS")
+results_wide_temp_PTII <- results_wide_temp %>% filter(sub_type2 == "RM Type IIP")
+results_wide_temp_TIII <- results_wide_temp %>% filter(sub_type2 == "RM Type III")
+results_wide_temp_PAMS <- results_wide_temp %>% filter(sub_type2 == "PAMS")
+
+bins <- 30
 
 binned_lyt <- results_wide_lyt %>%
   group_by(sub_type2) %>%
@@ -180,6 +190,24 @@ binned_temp <- results_wide_temp %>%
     x_mid = -1 + (x_bin - 0.5) * (1.3 - (-1)) / bins,
     y_mid = -1 + (y_bin - 0.5) * (1.3 - (-1)) / bins
   )
+
+binned_lyt_NPTI <- binned_lyt %>% filter(sub_type2 == "Non-palindromic\nType I_RM")
+binned_lyt_PTI <- binned_lyt %>% filter(sub_type2 == "Palindromic\nType I RM")
+binned_lyt_NPTII <- binned_lyt %>% filter(sub_type2 == "RM Type IIG & IIS")
+binned_lyt_PTII <- binned_lyt %>% filter(sub_type2 == "RM Type IIP")
+binned_lyt_TIII <- binned_lyt %>% filter(sub_type2 == "RM Type III")
+binned_lyt_PAMS <- binned_lyt %>% filter(sub_type2 == "PAMS")
+
+binned_temp_NPTI <- binned_temp %>% filter(sub_type2 == "Non-palindromic\nType I_RM")
+binned_temp_PTI <- binned_temp %>% filter(sub_type2 == "Palindromic\nType I RM")
+binned_temp_NPTII <- binned_temp %>% filter(sub_type2 == "RM Type IIG & IIS")
+binned_temp_PTII <- binned_temp %>% filter(sub_type2 == "RM Type IIP")
+binned_temp_TIII <- binned_temp %>% filter(sub_type2 == "RM Type III")
+binned_temp_PAMS <- binned_temp %>% filter(sub_type2 == "PAMS")
+
+# 4.0 Plotting ####
+
+## 4.1 new style main fig ####
 
 p1_lyt <- ggplot(binned_lyt, aes(x = x_mid, y = y_mid, fill = log10(prop + 1e-6))) +
   geom_tile(width = diff(range(-1,1.3))/30, height = diff(range(-1,1.3))/30) +
@@ -337,7 +365,201 @@ figure
 
 dev.off()
 
-## 4.2 incorporating abundances ####
+## 4.2 SI fig split by phages ####
+
+p3A_lyt <- ggplot(binned_lyt, aes(x = x_mid, y = y_mid, fill = log10(prop + 1e-6))) +
+  geom_tile(width = diff(range(-1,1.3))/30, height = diff(range(-1,1.3))/30) +
+  facet_wrap(~genome) +
+  geom_hline(yintercept = 0, linewidth = 1, linetype = "dashed") +
+  geom_vline(xintercept = 0, linewidth = 1, linetype = "dashed") +
+  geom_hline(yintercept = c(- 0.553,  0.553),linewidth = 0.75) +
+  geom_vline(xintercept = c(- 0.553,  0.553),linewidth = 0.75) +
+  theme_bw() +
+  xlab("Signed log10 standardized residual\n(observed − expected, fwd strand)") +
+  ylab("Signed log10 standardized residual\n(observed − expected, rvs strand)") +
+  labs(fill = "log10(Proportion)") +
+  scale_fill_viridis_c() +
+  theme(legend.position = "bottom",
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16))
+
+p3A_lyt
+
+p3A_temp <- ggplot(binned_temp, aes(x = x_mid, y = y_mid, fill = log10(prop + 1e-6))) +
+  geom_tile(width = diff(range(-1,1.3))/30, height = diff(range(-1,1.3))/30) +
+  facet_wrap(~genome) +
+  geom_hline(yintercept = 0, linewidth = 1, linetype = "dashed") +
+  geom_vline(xintercept = 0, linewidth = 1, linetype = "dashed") +
+  geom_hline(yintercept = c(- 0.553,  0.553),linewidth = 0.75) +
+  geom_vline(xintercept = c(- 0.553,  0.553),linewidth = 0.75) +
+  theme_bw() +
+  xlab("Signed log10 standardized residual\n(observed − expected, fwd strand)") +
+  ylab("Signed log10 standardized residual\n(observed − expected, rvs strand)") +
+  labs(fill = "log10(Proportion)") +
+  scale_fill_viridis_c() +
+  theme(legend.position = "bottom",
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16))
+
+p3A_temp
+
+p3B_lyt <- ggplot(results_wide_lyt, aes(x = signed_log_SR_forward, y = signed_log_SR_reverse)) +
+  geom_pointdensity(adjust= 0.1) +
+  facet_wrap(~genome,ncol = 8)+
+  geom_hline(yintercept = 0, linewidth = 0.5, linetype = "dashed") +
+  geom_vline(xintercept = 0, linewidth = 0.5, linetype = "dashed") +
+  geom_hline(yintercept = c(- 0.553,  0.553),linewidth = 0.5) +
+  geom_vline(xintercept = c(- 0.553,  0.553),linewidth = 0.5) +
+  theme_bw() +
+  xlab("Signed log10 standardized residual\n(observed − expected, fwd strand)") +
+  ylab("Signed log10 standardized residual\n(observed − expected, rvs strand)") +
+  labs(colour = "Density")+
+  scale_color_viridis(trans = "log10")+
+  theme(legend.position = "bottom",
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16))
+
+
+p3B_lyt
+
+p3B_temp <- ggplot(results_wide_temp, aes(x = signed_log_SR_forward, y = signed_log_SR_reverse)) +
+  geom_pointdensity(adjust= 0.1) +
+  facet_wrap(~genome,ncol = 8)+
+  geom_hline(yintercept = 0, linewidth = 0.5, linetype = "dashed") +
+  geom_vline(xintercept = 0, linewidth = 0.5, linetype = "dashed") +
+  geom_hline(yintercept = c(- 0.553,  0.553),linewidth = 0.5) +
+  geom_vline(xintercept = c(- 0.553,  0.553),linewidth = 0.5) +
+  theme_bw() +
+  xlab("Signed log10 standardized residual\n(observed − expected, fwd strand)") +
+  ylab("Signed log10 standardized residual\n(observed − expected, rvs strand)") +
+  labs(colour = "Density")+
+  scale_color_viridis(trans = "log10")+
+  theme(legend.position = "bottom",
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16))
+
+
+p3B_temp
+
+
+## 4.3 split by motifs ####
+
+results_wide_lyt <- results_wide %>%
+  filter(phage_type == "lytic")
+
+results_wide_temp <- results_wide %>%
+  filter(phage_type == "temperate")
+
+
+
+
+binned_lyt <- results_wide_lyt %>%
+  group_by(motif,sub_type2) %>%
+  mutate(
+    x_bin = cut(signed_log_SR_forward, breaks = seq(-1, 1.3, length.out = bins + 1), include.lowest = TRUE, labels = FALSE),
+    y_bin = cut(signed_log_SR_reverse, breaks = seq(-1, 1.3, length.out = bins + 1), include.lowest = TRUE, labels = FALSE)
+  ) %>%
+  count(motif, x_bin, y_bin) %>%
+  group_by(motif) %>%
+  mutate(prop = n / sum(n)) %>%
+  ungroup() %>%
+  mutate(
+    x_mid = -1 + (x_bin - 0.5) * (1.3 - (-1)) / bins,
+    y_mid = -1 + (y_bin - 0.5) * (1.3 - (-1)) / bins
+  )
+
+binned_temp <- results_wide_temp %>%
+  group_by(motif,sub_type2) %>%
+  mutate(
+    x_bin = cut(signed_log_SR_forward, breaks = seq(-1, 1.3, length.out = bins + 1), include.lowest = TRUE, labels = FALSE),
+    y_bin = cut(signed_log_SR_reverse, breaks = seq(-1, 1.3, length.out = bins + 1), include.lowest = TRUE, labels = FALSE)
+  ) %>%
+  count(motif, x_bin, y_bin) %>%
+  group_by(motif) %>%
+  mutate(prop = n / sum(n)) %>%
+  ungroup() %>%
+  mutate(
+    x_mid = -1 + (x_bin - 0.5) * (1.3 - (-1)) / bins,
+    y_mid = -1 + (y_bin - 0.5) * (1.3 - (-1)) / bins
+  )
+
+p4l1_lyt <- ggplot(binned_lyt_NPTI, aes(x = x_mid, y = y_mid, fill = log10(prop + 1e-6))) +
+  geom_tile(width = diff(range(-1,1.3))/30, height = diff(range(-1,1.3))/30) +
+  facet_wrap(~motif,ncol = 8)+
+  geom_hline(yintercept = 0, linewidth = 1, linetype = "dashed") +
+  geom_vline(xintercept = 0, linewidth = 1, linetype = "dashed") +
+  geom_hline(yintercept = c(- 0.553,  0.553),linewidth = 0.75) +
+  geom_vline(xintercept = c(- 0.553,  0.553),linewidth = 0.75) +
+  theme_bw() +
+  xlab("Signed log10 standardized residual\n(observed − expected, fwd strand)") +
+  ylab("Signed log10 standardized residual\n(observed − expected, rvs strand)") +
+  labs(fill = "log10(Proportion)") +
+  scale_fill_viridis_c() +
+  theme(legend.position = "bottom",
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16))
+
+jpeg("plots/p4l1_lyt.jpeg", width = 4000, height = 3000, units = "px", res = 300)
+
+p4l1_lyt
+
+dev.off()
+
+results_wide_lytNPTI <- results_wide_lyt %>%
+  filter(sub_type2 == "Non-palindromic\nType I_RM")
+
+p5l1_lyt <- ggplot(results_wide_lytNPTI, aes(x = signed_log_SR_forward, y = signed_log_SR_reverse)) +
+  geom_pointdensity(adjust= 0.1) +
+  facet_wrap(~motif,ncol = 8)+
+  geom_hline(yintercept = 0, linewidth = 0.5, linetype = "dashed") +
+  geom_vline(xintercept = 0, linewidth = 0.5, linetype = "dashed") +
+  geom_hline(yintercept = c(- 0.553,  0.553),linewidth = 0.5) +
+  geom_vline(xintercept = c(- 0.553,  0.553),linewidth = 0.5) +
+  theme_bw() +
+  xlab("Signed log10 standardized residual\n(observed − expected, fwd strand)") +
+  ylab("Signed log10 standardized residual\n(observed − expected, rvs strand)") +
+  labs(colour = "Density")+
+  scale_color_viridis(trans = "log10")+
+  theme(legend.position = "bottom",
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16))
+
+
+p5l1_lyt
+
+
+jpeg("plots/p5l1_lyt.jpeg", width = 4000, height = 3000, units = "px", res = 300)
+
+p5l1_lyt
+
+dev.off()
+
+
+
+
+# test <- results_wide %>% filter(genome == "3")
+# 
+# summary(test$sub_type)
+# 
+# test$sub_type2 <- as.factor(test$sub_type2)
+# 
+# test <- test %>%
+#   mutate(sub_type2 = case_when(
+#     type == "RM_Type_I" & Palindromic == "Non-palindromic" ~ "Non-palindromic\nType I_RM",
+#     type == "RM_Type_I" & Palindromic == "Palindromic" ~ "Palindromic\nType I RM",
+#     sub_type == "RM_Type_IIG" ~ "RM Type IIG & IIS",
+#     sub_type == "RM_Type_IIS" ~ "RM Type IIG & IIS",
+#     sub_type == "RM_Type_IIP" ~ "RM Type IIP",
+#     sub_type == "RM_Type_III" ~ "RM Type III",
+#     TRUE ~ sub_type)) %>%
+#   filter(sub_type != "RM_Type_IIM")
+
+
+
+
+
+
+## 4.3 incorporating abundances ####
 
 results_wide_temp
 results_wide_lyt
@@ -405,7 +627,7 @@ p3_lyt
 
 
 
-## 4.2 Older style ####
+## 4.3 SCRAP Older style ####
 
 # facet by major types, keep palindromes, use geom_point 
 
